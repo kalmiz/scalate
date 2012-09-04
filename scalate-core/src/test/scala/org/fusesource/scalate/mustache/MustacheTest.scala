@@ -32,7 +32,7 @@ class MustacheTest extends TemplateTestSupport {
     assertMoustacheOutput("Hey James!", "Hey {{name}}!", Map("name" -> "James"))
   }
 
-  ignore("non false not a list") {
+  test("non false not a list") {
     assertMoustacheOutput("Hi James! ",
       "{{#person?}} Hi {{name}}! {{/person?}}",
       Map("person?" -> Map("name" -> "James")))
@@ -41,6 +41,18 @@ class MustacheTest extends TemplateTestSupport {
   test("non false not a list with simple name") {
     assertMoustacheOutput("Hi James ",
       "{{#person}} Hi {{name}} {{/person}}",
+      Map("person" -> Map("name" -> "James")))
+  }
+
+  test("dot notation non false not a list with simple name") {
+    assertMoustacheOutput("Hi James ",
+      "Hi {{person.name}} ",
+      Map("person" -> Map("name" -> "James")))
+  }
+
+  test("dot notation section non false not a list with simple name") {
+    assertMoustacheOutput("Hi James ",
+      "{{#person.name}} Hi {{name}} {{/person.name}}",
       Map("person" -> Map("name" -> "James")))
   }
 }

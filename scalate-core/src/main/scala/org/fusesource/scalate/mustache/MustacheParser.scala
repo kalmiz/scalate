@@ -25,6 +25,8 @@ import org.fusesource.scalate.util.Log
 sealed abstract class Statement extends Positional {
 }
 
+object Statement
+
 /**
  * Is a String with positioning information
  */
@@ -83,12 +85,33 @@ class MustacheParser extends RegexParsers  {
 
   def unescapeVariableMustash = expression("{" ~> trimmed <~ "}" ^^ {Variable(_, true)})
 
+  private def recursiveStatement(members: Array[String], body: List[Statement], statementClass: String): List[Statement] = members.headOption match {
+    case Some(name: String) if name != "" => statementClass match {
+      case "Section" => List(Section(Text(name), recursiveStatement(members.drop(1), body, statementClass)))
+	  case "InvertSection" => List(InvertSection(Text(name), recursiveStatement(members.drop(1), body, statementClass)))
+      case _ => body
+	}
+    case _ => body
+  }
+
   def section = positioned(nested("#") ^^ {
-    case (name, body) => Section(name, body)
+    case (name, body) => if (name.value != "." && name.value.contains(".")) {
+      val members = name.value.split("\\.")
+      Section(Text(members.head), recursiveStatement(members.drop(1), body, "Section"))
+	} else {
+      Section(name, body)
+	}
   })
 
   def invert = positioned(nested("^") ^^ {
-    case (name, body) => InvertSection(name, body)
+    case (name, body) => if (name.value != "." && name.value.contains(".")) {
+      val members = name.value.split("\\.")
+	  val variable = members.last
+	  val sections = members.dropRight(1)
+      Section(Text(sections.head), recursiveStatement(sections.drop(1), List(InvertSection(Text(variable), body)), "Section"))
+	} else {
+      InvertSection(name, body)
+	}
   })
 
   def partial = expression(operation(">") ^^ {Partial(_)})
@@ -109,7 +132,16 @@ class MustacheParser extends RegexParsers  {
 
   def comment = expression((trim("!") ~> upto(close)) ^^ {Comment(_)})
 
-  def variable = expression(trimmed ^^ {Variable(_, false)})
+  def variable = expression(trimmed ^^ {
+	case name => if (name.value != "." && name.value.contains(".")) {
+      val members = name.value.split("\\.")
+	  val variable = members.last
+	  val sections = members.dropRight(1)
+      Section(Text(sections.head), recursiveStatement(sections.drop(1), List(Variable(Text(variable), false)), "Section"))
+    } else {
+      Variable(name, false)
+    }
+  })
 
   def setDelimiter = expression(("=" ~> text("""\S+""".r) <~ " ") ~ (upto("=" ~ close) <~ ("=")) ^^ {
     case a ~ b => SetDelimiter(a, b)
